@@ -11,7 +11,7 @@ UUGrapplingAttachComponent::UUGrapplingAttachComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 
-	AttachCollider = CreateDefaultSubobject<UBoxComponent>(TEXT("AttachCollider"));
+	
 }
 
 
@@ -19,7 +19,6 @@ UUGrapplingAttachComponent::UUGrapplingAttachComponent()
 void UUGrapplingAttachComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
 	// ...
 	
 }

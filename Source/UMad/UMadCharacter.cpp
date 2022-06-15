@@ -13,6 +13,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AUMadCharacter::AUMadCharacter()
@@ -68,7 +69,10 @@ void AUMadCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
     	check(PlayerInputComponent);
     	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
     	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
-    
+		PlayerInputComponent->BindAction("Grapple", IE_Pressed, this, &AUMadCharacter::StartGrappling);
+		PlayerInputComponent->BindAction("Grapple", IE_Released, this, &AUMadCharacter::EndGrappling);
+		PlayerInputComponent->BindAction("Ragdoll", IE_Pressed, this, &AUMadCharacter::Ragdoll);
+	
     	PlayerInputComponent->BindAxis("MoveForward", this, &AUMadCharacter::MoveForward);
     	PlayerInputComponent->BindAxis("MoveRight", this, &AUMadCharacter::MoveRight);
     
@@ -83,7 +87,7 @@ void AUMadCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
     	if(AbilitySystemComponent && InputComponent)
     	{
     		const FGameplayAbilityInputBinds Binds (
-    			"Confirm","Cancel","EOrtharAbilityInputID",
+    			"Confirm","Cancel","EUMadAbilityInputID",
     			static_cast<int32>(EUMadAbilityInputID::Confirm), static_cast<int32>(EUMadAbilityInputID::Cancel));
     		AbilitySystemComponent->BindAbilityActivationToInputComponent(InputComponent, Binds);
     	}
@@ -164,6 +168,79 @@ void AUMadCharacter::OnRep_PlayerState()
 	// }
 }
 
+void AUMadCharacter::AddPossibleGrapplingAttach(AGrapplingAttachActor* Actor)
+{
+	if(Actor != nullptr)
+	{
+		PossibleGrapplingAttaches.Add(Actor);
+		
+		GetNearestAttach();
+	}
+}
+
+void AUMadCharacter::RemovePossibleGrapplingAttach(AGrapplingAttachActor* Actor)
+{
+	if(Actor != nullptr)
+	{
+		if(NearestGrapplingAttach == Actor)
+			NearestGrapplingAttach->UnselectAttach();
+		
+		PossibleGrapplingAttaches.Remove(Actor);
+		
+		GetNearestAttach();
+	}
+}
+
+void AUMadCharacter::GetNearestAttach()
+{
+	const int NbOfAttaches = PossibleGrapplingAttaches.Num();
+	int LowestI = 0;
+	_attachesTimer = -1;
+	
+	if(NbOfAttaches == 0)
+		return;
+	else if(NbOfAttaches > 1)
+	{
+		APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+		int vX, vY;
+		PlayerController->GetViewportSize(vX, vY);
+		FVector2D vDimensions = FVector2D(vX, vY);
+		FVector2D finalLocation;
+	
+		float LowestDist = std::numeric_limits<float>::max();
+		for (int i = 0; i < NbOfAttaches; i++)
+		{
+			PlayerController->ProjectWorldLocationToScreen(PossibleGrapplingAttaches[i]->GetTransform().GetLocation(), finalLocation);
+			FVector2D resultVector = (vDimensions / 2) - finalLocation;
+
+			int dist = resultVector.Length();
+		
+			if(dist < LowestDist) {
+				LowestDist = dist;
+				LowestI = i;
+			}
+		}
+	}
+	if(NearestGrapplingAttach != nullptr)
+		NearestGrapplingAttach->UnselectAttach();
+	NearestGrapplingAttach = PossibleGrapplingAttaches[LowestI];
+	NearestGrapplingAttach->SelectAttach();
+
+	_attachesTimer = 0;
+}
+
+void AUMadCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(_attachesTimer != -1)
+	{
+		_attachesTimer += DeltaSeconds;
+		if(_attachesTimer > 0.2)
+			GetNearestAttach();
+	}
+}
+
 void AUMadCharacter::MoveForward(float Value)
 {
 	if ((Controller != nullptr) && (Value != 0.0f))
@@ -191,6 +268,31 @@ void AUMadCharacter::MoveRight(float Value)
 		// add movement in that direction
 		AddMovementInput(Direction, Value);
 	}
+}
+
+void AUMadCharacter::StartGrappling()
+{
+	_beginGrapple = UGameplayStatics::GetRealTimeSeconds(GetWorld());
+}
+
+void AUMadCharacter::EndGrappling()
+{
+	float chargingTime = UGameplayStatics::GetRealTimeSeconds(GetWorld()) - _beginGrapple;
+
+	UE_LOG(LogTemp, Warning, TEXT("Launched the caracter"));
+	
+	FVector dir = NearestGrapplingAttach->GetActorLocation() - GetActorLocation();
+	dir *= 2;
+	LaunchCharacter(dir, true, true);
+}
+
+
+void AUMadCharacter::Ragdoll()
+{
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	MeshComp->SetAllBodiesSimulatePhysics(true);
+	MeshComp->SetSimulatePhysics(true);
+	MeshComp->WakeAllRigidBodies();
 }
 
 

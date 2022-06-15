@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include <GameplayEffectTypes.h>
+
+#include "GrapplingAttachActor.h"
 #include "UMadCharacter.generated.h"
 
 UCLASS(Config=Game)
@@ -48,19 +50,32 @@ public:
 
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
-	
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Orthar")
+
+	void AddPossibleGrapplingAttach(AGrapplingAttachActor* Actor);
+	void RemovePossibleGrapplingAttach(AGrapplingAttachActor* Actor);
+	void GetNearestAttach();
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "UMad")
 	TSubclassOf<class UGameplayEffect> DefaultAttributeEffect;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Orthar")
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "UMad")
 	TArray<TSubclassOf<class UUMadGameplayAbility>> DefaultAbilities;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "UMad")
+	TArray<AGrapplingAttachActor*> PossibleGrapplingAttaches;
+
+	AGrapplingAttachActor* NearestGrapplingAttach = nullptr;
 	
+	virtual void Tick(float DeltaSeconds) override;
 protected:
 	/** Called for forwards/backward input */
 	void MoveForward(float Value);
 
 	/** Called for side to side input */
 	void MoveRight(float Value);
+	void StartGrappling();
+	void EndGrappling();
+	void Ragdoll();
 
 	/** 
 	 * Called via input to turn at a given rate. 
@@ -75,11 +90,13 @@ protected:
 	void LookUpAtRate(float Rate);
 private:
 	bool _initedInputs = false;
+	float _attachesTimer = -1;
+	float _beginGrapple = -1;
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	// End of APawn interface
-
+	
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
