@@ -17,7 +17,7 @@
  * 
  */
 UCLASS()
-class UMAD_API UUMadAttributeSet : public UAttributeSet
+class UMAD_API FiUUMadAttributeSet : public UAttributeSet
 {
 	GENERATED_BODY()
 
