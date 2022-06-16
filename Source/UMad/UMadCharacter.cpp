@@ -3,6 +3,7 @@
 
 #include "UMadCharacter.h"
 
+#include "GrappleLine.h"
 #include "UMadAbilitySystemComponent.h"
 #include "UMadAttributeSet.h"
 #include "UUMadGameplayAbility.h"
@@ -14,6 +15,21 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "Particles/ParticleSystem.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "CableComponent.h"
+#include "GrappleComponent.h"
+
+//UENUM(BlueprintType)
+UENUM()
+enum Status
+{
+	Retracted     UMETA(DisplayName = "Retracted"),
+	Firing      UMETA(DisplayName = "Firing"),
+	NearingTarget   UMETA(DisplayName = "NearingTarget"),
+	OnTarget	UMETA(DisplayName = "OnTarget")
+};
 
 // Sets default values
 AUMadCharacter::AUMadCharacter()
@@ -41,11 +57,13 @@ AUMadCharacter::AUMadCharacter()
     	CameraBoom->SetupAttachment(RootComponent);
     	CameraBoom->TargetArmLength = 300.0f; // The camera follows at this distance behind the character	
     	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
-    
-    	GrappleAttachesCollider = CreateDefaultSubobject<USphereComponent>(TEXT("GrappleAttachesCollider"));
-    	GrappleAttachesCollider->SetupAttachment((RootComponent));
-    	GrappleAttachesCollider->InitSphereRadius(100);
-    	
+
+		GrappleComp = CreateDefaultSubobject<UGrappleComponent>(TEXT("Grapple Component"));
+		GrappleComp->Owner = this;
+	
+		GrappleBeginEffect = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("GrappleBeginEffect"));
+		GrappleBeginEffect->SetupAttachment(RootComponent);
+	
     	// Create a follow camera
     	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
     	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
@@ -168,6 +186,8 @@ void AUMadCharacter::OnRep_PlayerState()
 	// }
 }
 
+#pragma region GrapplingHook
+
 void AUMadCharacter::AddPossibleGrapplingAttach(AGrapplingAttachActor* Actor)
 {
 	if(Actor != nullptr)
@@ -183,7 +203,10 @@ void AUMadCharacter::RemovePossibleGrapplingAttach(AGrapplingAttachActor* Actor)
 	if(Actor != nullptr)
 	{
 		if(NearestGrapplingAttach == Actor)
+		{
 			NearestGrapplingAttach->UnselectAttach();
+			NearestGrapplingAttach = nullptr;
+		}
 		
 		PossibleGrapplingAttaches.Remove(Actor);
 		
@@ -229,17 +252,53 @@ void AUMadCharacter::GetNearestAttach()
 	_attachesTimer = 0;
 }
 
+void AUMadCharacter::StartGrappling()
+{
+	if(NearestGrapplingAttach != nullptr)
+	{
+	    IsUsingGrapple = true;
+		_beginGrapple = UGameplayStatics::GetRealTimeSeconds(GetWorld());
+		GrappleComp->BeginGrapple(NearestGrapplingAttach);
+	}
+}
+
+void AUMadCharacter::EndGrappling()
+{
+	if(NearestGrapplingAttach == nullptr)
+		return;
+	
+	bool HasReleasedGrapple = true;
+	float chargingTime = UGameplayStatics::GetRealTimeSeconds(GetWorld()) - _beginGrapple;
+
+	if(M_GrapplePull)
+		PlayAnimMontage(M_GrapplePull, 1, NAME_None);
+	FVector dir = NearestGrapplingAttach->GetActorLocation() - GetActorLocation();
+	dir *= 2;
+	//LaunchCharacter(dir, true, true);
+}
+
+#pragma endregion GrapplingHook
+
 void AUMadCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
 	if(_attachesTimer != -1)
 	{
+		FHitResult hit;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		
+		GetWorld()->LineTraceSingleByChannel(hit, GetActorLocation(), NearestGrapplingAttach->GetActorLocation(), ECollisionChannel::ECC_Visibility, Params,FCollisionResponseParams());
+		DrawDebugLine(GetWorld(),GetActorLocation(), NearestGrapplingAttach->GetActorLocation(), FColor::Red, false, 5.0f);
+		
 		_attachesTimer += DeltaSeconds;
 		if(_attachesTimer > 0.2)
 			GetNearestAttach();
 	}
 }
+
+
 
 void AUMadCharacter::MoveForward(float Value)
 {
@@ -270,21 +329,6 @@ void AUMadCharacter::MoveRight(float Value)
 	}
 }
 
-void AUMadCharacter::StartGrappling()
-{
-	_beginGrapple = UGameplayStatics::GetRealTimeSeconds(GetWorld());
-}
-
-void AUMadCharacter::EndGrappling()
-{
-	float chargingTime = UGameplayStatics::GetRealTimeSeconds(GetWorld()) - _beginGrapple;
-
-	UE_LOG(LogTemp, Warning, TEXT("Launched the caracter"));
-	
-	FVector dir = NearestGrapplingAttach->GetActorLocation() - GetActorLocation();
-	dir *= 2;
-	LaunchCharacter(dir, true, true);
-}
 
 
 void AUMadCharacter::Ragdoll()
@@ -294,5 +338,3 @@ void AUMadCharacter::Ragdoll()
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
 }
-
-

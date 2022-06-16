@@ -8,6 +8,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/BoxComponent.h"
 #include "Misc/OutputDeviceNull.h"
+#include "Particles/ParticleSystemComponent.h"
 
 // Sets default values
 AGrapplingAttachActor::AGrapplingAttachActor()
