@@ -30,17 +30,8 @@ class UMAD_API AUMadCharacter : public ACharacter, public IAbilitySystemInterfac
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Collider, meta = (AllowPrivateAccess = "true"))
 	class USphereComponent* GrappleAttachesCollider;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = KyEffects, meta = (AllowPrivateAccess = "true"))
-	class UParticleSystemComponent* GrappleBeginEffect;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Grapple, meta = (AllowPrivateAccess = "true"))
 	class UGrappleComponent* GrappleComp;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation,  meta = (AllowPrivateAccess = "true"))
-	UAnimMontage* M_GrappleLaunch;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation,  meta = (AllowPrivateAccess = "true"))
-	UAnimMontage* M_GrapplePull;
 	
 	UPROPERTY()
 	class UUMadAttributeSet* Attributes;
@@ -61,6 +52,12 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool HasReleaseGrapple;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UCurveFloat* GrappleForce = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float GrappleChargeTime = 1.3f;
 	
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
@@ -94,6 +91,8 @@ protected:
 	/** Called for side to side input */
 	void MoveRight(float Value);
 	void StartGrappling();
+	void ResetBinding(FInputAxisBinding bind);
+	bool CompareInputActionBindings(FInputAxisBinding lhs, FInputAxisBinding rhs);
 	void EndGrappling();
 	void Ragdoll();
 

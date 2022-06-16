@@ -32,9 +32,13 @@ private:
 	FVector _endingLocation;
 	FVector _direction;
 
+	ACharacter* Owner;
+
 	float _progress = -1;
+	bool _goBackToOwner = false;
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	void StartGrapple(FVector Start, FVector Target, ACharacter* GrappleOwner);
+	void EndGrapple();
 };

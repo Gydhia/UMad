@@ -5,6 +5,7 @@
 
 #include "GameFramework/Character.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Microsoft/AllowMicrosoftPlatformTypes.h"
 #include "UObject/ReferenceChainSearch.h"
 
 // Sets default values
@@ -29,11 +30,30 @@ void AKahnaxGrapple::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if(_progress != -1 && _progress <= TimeToReach)
+	if(_progress != -1)
 	{
-		_progress += DeltaTime;
-		GrappleLine->SetVectorParameter(FName("GrappleEnd"), FMath::Lerp(_startingLocation, _endingLocation, _progress / TimeToReach));
+		if(_progress <= TimeToReach)
+		{
+			if(!_goBackToOwner)
+			{
+				_progress += DeltaTime;
+				GrappleLine->SetVectorParameter(FName("GrappleEnd"), FMath::Lerp(_startingLocation, _endingLocation, _progress / TimeToReach));
+			}
+			else
+			{
+				_progress += DeltaTime;
+				GrappleLine->SetVectorParameter(FName("GrappleEnd"), FMath::Lerp(_startingLocation, Owner->GetMesh()->GetBoneLocation(FName("RightHand")), _progress / TimeToReach));
+			}
+		}
+		else
+		{
+			if(_goBackToOwner)
+			{
+				Destroy();
+			}
+		}
 	}
+	
 }
 
 void AKahnaxGrapple::StartGrapple(FVector Start, FVector Target, ACharacter* GrappleOwner)
@@ -41,15 +61,18 @@ void AKahnaxGrapple::StartGrapple(FVector Start, FVector Target, ACharacter* Gra
 	_startingLocation = Start;
 	_endingLocation = Target;
 
-	// Use User.GrappleEnd if not working
+	Owner = GrappleOwner;
 	GrappleLine->SetVectorParameter(FName("GrappleEnd"), Target);
 	GrappleLine->Activate();
 	GrappleLine->AttachToComponent(GrappleOwner->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, FName("RightHand"));
-	// _direction = _endingLocation - _startingLocation;
-	// _direction.Normalize(0.0001);
 
 	_progress = 0;
+}
 
-	//_direction * Speed;
+void AKahnaxGrapple::EndGrapple()
+{
+	_startingLocation = _endingLocation;
 	
+	_progress = 0;
+	_goBackToOwner = true;
 }

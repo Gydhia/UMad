@@ -13,8 +13,6 @@ UGrappleComponent::UGrappleComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
 }
 
 
@@ -22,8 +20,6 @@ UGrappleComponent::UGrappleComponent()
 void UGrappleComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
-	// ...
 	
 }
 
@@ -37,20 +33,16 @@ void UGrappleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 void UGrappleComponent::BeginGrapple(AActor* NearestAttach)
 {
 	FVector Start = Owner->GetActorLocation();
-	
 	UWorld* World = GetWorld();
+
+	TargetAttach = NearestAttach->GetActorLocation();
 	
 	_grapple = World->SpawnActor<AKahnaxGrapple>(Grapple, Start, Owner->GetActorRotation());
-	if(_grapple != nullptr)
-	{
-		TargetAttach = NearestAttach->GetActorLocation();
+	_grapple->StartGrapple(Start, NearestAttach->GetActorLocation(), Owner);
+}
 
-		_grapple->StartGrapple(Start, NearestAttach->GetActorLocation(), Owner);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Couldn't create Kahnax Grapple"));
-	}
-	
+void UGrappleComponent::EndGrapple()
+{
+	_grapple->EndGrapple();
 }
 
