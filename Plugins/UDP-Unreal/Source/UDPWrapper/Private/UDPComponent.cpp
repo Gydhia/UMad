@@ -72,6 +72,11 @@ bool UUDPComponent::CloseSendSocket()
 	return Native->CloseSendSocket();
 }
 
+FString UUDPComponent::GetLocalIPAdress()
+{
+	return Native->GetLocalIPAdress();
+}
+
 bool UUDPComponent::OpenReceiveSocket(const FString& InListenIp /*= TEXT("0.0.0.0")*/, const int32 InListenPort /*= 3002*/)
 {
 	//Sync side effect sampled settings
@@ -205,6 +210,22 @@ bool FUDPNative::CloseSendSocket()
 	}
 
 	return bDidCloseCorrectly;
+}
+
+FString FUDPNative::GetLocalIPAdress()
+{
+	bool canBind = false;
+	TSharedRef<FInternetAddr> localIp = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalHostAddr(*GLog, canBind);
+
+	if (localIp->IsValid())
+	{
+		//GLog->Log(localIp->ToString(false)); // if you want to append the port (true) or not (false).
+		return localIp->ToString(false);
+	}
+	else
+	{
+		return FString("");
+	}
 }
 
 bool FUDPNative::EmitBytes(const TArray<uint8>& Bytes)

@@ -99,6 +99,8 @@ public:
 	*/
 	bool CloseSendSocket();
 
+	FString GetLocalIPAdress();
+	
 	/** 
 	* Emit given bytes to send socket. If Settings.bShouldAutoOpenSend is true it will auto-open socket.
 	* Returns true if bytes emitted successfully
@@ -181,6 +183,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UDP Functions")
 	bool CloseSendSocket();
 
+	UFUNCTION(BlueprintCallable, Category = "UDP Functions")
+	FString GetLocalIPAdress();
+	
 	/** 
 	* Start listening at given port for udp messages. Will auto-listen on BeginPlay by default. Listen IP of 0.0.0.0 means all connections.
 	*/
