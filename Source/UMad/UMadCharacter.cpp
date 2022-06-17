@@ -384,7 +384,6 @@ void AUMadCharacter::Ragdoll()
 
 	FTimerHandle UnusedHandle;
 	GetWorldTimerManager().SetTimer(UnusedHandle, this, &AUMadCharacter::EndRagdoll, RagdollDelay, false);
-	
 }
 
 void AUMadCharacter::EndRagdoll()
