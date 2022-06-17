@@ -30,17 +30,8 @@ class UMAD_API AUMadCharacter : public ACharacter, public IAbilitySystemInterfac
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Collider, meta = (AllowPrivateAccess = "true"))
 	class USphereComponent* GrappleAttachesCollider;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = KyEffects, meta = (AllowPrivateAccess = "true"))
-	class UParticleSystemComponent* GrappleBeginEffect;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Grapple, meta = (AllowPrivateAccess = "true"))
 	class UGrappleComponent* GrappleComp;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation,  meta = (AllowPrivateAccess = "true"))
-	UAnimMontage* M_GrappleLaunch;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation,  meta = (AllowPrivateAccess = "true"))
-	UAnimMontage* M_GrapplePull;
 	
 	UPROPERTY()
 	class UUMadAttributeSet* Attributes;
@@ -56,11 +47,20 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
 	float BaseLookUpRate;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite)
 	bool IsUsingGrapple;
 	
+	UPROPERTY(BlueprintReadWrite)
+	bool HasReleasedGrapple;
+	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool HasReleaseGrapple;
+	UCurveFloat* GrappleForce = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GrapplingHook, meta = (AllowPrivateAccess = "true"))
+	float GrappleTimeBeforeExplosion = 1.5f;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float GrappleChargeTime = 0.6f;
 	
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
@@ -84,6 +84,7 @@ public:
 	TArray<AGrapplingAttachActor*> PossibleGrapplingAttaches;
 
 	AGrapplingAttachActor* NearestGrapplingAttach = nullptr;
+	AGrapplingAttachActor* CurrentGrapplingAttach = nullptr;
 	
 	virtual void Tick(float DeltaSeconds) override;
 	float GetAngleFromAttach(FVector Start, FVector Target);
@@ -94,6 +95,8 @@ protected:
 	/** Called for side to side input */
 	void MoveRight(float Value);
 	void StartGrappling();
+	void ResetBinding(FInputAxisBinding bind);
+	bool CompareInputActionBindings(FInputAxisBinding lhs, FInputAxisBinding rhs);
 	void EndGrappling();
 	void Ragdoll();
 
@@ -112,6 +115,7 @@ private:
 	bool _initedInputs = false;
 	float _attachesTimer = -1;
 	float _beginGrapple = -1;
+	float _grappleTimer = -1;
 	ACableActor* _grappleLine;
 protected:
 	// APawn interface

@@ -3,7 +3,7 @@
 
 #include "UMadCharacter.h"
 
-#include "GrappleLine.h"
+
 #include "UMadAbilitySystemComponent.h"
 #include "UMadAttributeSet.h"
 #include "UUMadGameplayAbility.h"
@@ -16,10 +16,9 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
-#include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
-#include "CableComponent.h"
 #include "GrappleComponent.h"
+#include "AI/NavigationSystemBase.h"
 
 //UENUM(BlueprintType)
 UENUM()
@@ -60,9 +59,11 @@ AUMadCharacter::AUMadCharacter()
 
 		GrappleComp = CreateDefaultSubobject<UGrappleComponent>(TEXT("Grapple Component"));
 		GrappleComp->Owner = this;
-	
-		GrappleBeginEffect = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("GrappleBeginEffect"));
-		GrappleBeginEffect->SetupAttachment(RootComponent);
+
+		GrappleForce = NewObject<UCurveFloat>();
+		GrappleForce->FloatCurve.AddKey(0.0f, 250.0f);
+		GrappleForce->FloatCurve.AddKey(GrappleChargeTime, 1500.0f);
+		GrappleForce->FloatCurve.AddKey(GrappleTimeBeforeExplosion, 15000.0f);
 	
     	// Create a follow camera
     	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -101,7 +102,7 @@ void AUMadCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
     	PlayerInputComponent->BindAxis("TurnRate", this, &AUMadCharacter::TurnAtRate);
     	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
     	PlayerInputComponent->BindAxis("LookUpRate", this, &AUMadCharacter::LookUpAtRate);
-    
+	
     	if(AbilitySystemComponent && InputComponent)
     	{
     		const FGameplayAbilityInputBinds Binds (
@@ -243,38 +244,76 @@ void AUMadCharacter::GetNearestAttach()
 				LowestI = i;
 			}
 		}
+
+		_attachesTimer = 0;
 	}
 	if(NearestGrapplingAttach != nullptr)
 		NearestGrapplingAttach->UnselectAttach();
 	NearestGrapplingAttach = PossibleGrapplingAttaches[LowestI];
 	NearestGrapplingAttach->SelectAttach();
-
-	_attachesTimer = 0;
 }
 
 void AUMadCharacter::StartGrappling()
 {
 	if(NearestGrapplingAttach != nullptr)
 	{
-	    IsUsingGrapple = true;
+		_grappleTimer = 0.0f;
+		CurrentGrapplingAttach = NearestGrapplingAttach;
+
+		FInputAxisBinding axisBind = FInputAxisBinding("MoveForward");
+		ResetBinding(axisBind);
+		axisBind = FInputAxisBinding("MoveRight");
+		ResetBinding(axisBind);
+
+		FRotator PlayerRot = UKismetMathLibrary::FindLookAtRotation(this->GetActorLocation(), CurrentGrapplingAttach->GetActorLocation());
+		PlayerRot.Pitch = 0;
+		PlayerRot.Roll = 0;
+		PlayerRot.Yaw -= 30.0f;
+		SetActorRotation(PlayerRot);
+		
+	    this->IsUsingGrapple = true;
 		_beginGrapple = UGameplayStatics::GetRealTimeSeconds(GetWorld());
-		GrappleComp->BeginGrapple(NearestGrapplingAttach);
+		GrappleComp->BeginGrapple(CurrentGrapplingAttach);
 	}
+}
+void AUMadCharacter::ResetBinding(FInputAxisBinding bind)
+{
+	for (int i = 0; i < InputComponent->AxisBindings.Num(); i++)
+	{
+		if(CompareInputActionBindings(InputComponent->AxisBindings[i], bind))
+		{
+			InputComponent->AxisBindings.RemoveAt(i);
+			i--;
+			continue;
+		}
+	}
+}
+bool AUMadCharacter::CompareInputActionBindings(FInputAxisBinding lhs, FInputAxisBinding rhs)
+{
+	return lhs.AxisDelegate.GetDelegateForManualSet().GetHandle() == rhs.AxisDelegate.GetDelegateForManualSet().GetHandle() &&
+		lhs.AxisName == rhs.AxisName;
 }
 
 void AUMadCharacter::EndGrappling()
 {
-	if(NearestGrapplingAttach == nullptr)
+	if(CurrentGrapplingAttach == nullptr)
 		return;
+
+	InputComponent->BindAxis("MoveForward", this, &AUMadCharacter::MoveForward);
+	InputComponent->BindAxis("MoveRight", this, &AUMadCharacter::MoveRight);
 	
-	bool HasReleasedGrapple = true;
+	HasReleasedGrapple = true;
 	float chargingTime = UGameplayStatics::GetRealTimeSeconds(GetWorld()) - _beginGrapple;
 
-	if(M_GrapplePull)
-		PlayAnimMontage(M_GrapplePull, 1, NAME_None);
-	FVector dir = NearestGrapplingAttach->GetActorLocation() - GetActorLocation();
-	dir *= 2;
-	//LaunchCharacter(dir, true, true);
+	FVector dir = CurrentGrapplingAttach->GetActorLocation() - GetActorLocation();
+	dir.Normalize();
+	dir *= GrappleForce->GetFloatValue(chargingTime);
+
+	this->HasReleasedGrapple = true;
+	GrappleComp->EndGrapple();
+	LaunchCharacter(dir, true, true);
+
+	CurrentGrapplingAttach = nullptr;
 }
 
 #pragma endregion GrapplingHook
@@ -283,15 +322,18 @@ void AUMadCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if(this->IsUsingGrapple)
+	{
+		_grappleTimer += DeltaSeconds;
+		if(_grappleTimer >= GrappleTimeBeforeExplosion)
+		{
+			EndGrappling();
+			_grappleTimer = 0;
+		}
+	}
+	
 	if(_attachesTimer != -1)
 	{
-		FHitResult hit;
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(this);
-		
-		GetWorld()->LineTraceSingleByChannel(hit, GetActorLocation(), NearestGrapplingAttach->GetActorLocation(), ECollisionChannel::ECC_Visibility, Params,FCollisionResponseParams());
-		DrawDebugLine(GetWorld(),GetActorLocation(), NearestGrapplingAttach->GetActorLocation(), FColor::Red, false, 5.0f);
-		
 		_attachesTimer += DeltaSeconds;
 		if(_attachesTimer > 0.2)
 			GetNearestAttach();

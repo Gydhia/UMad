@@ -17,7 +17,9 @@ class UMAD_API AKahnaxGrapple : public AActor
 	UNiagaraComponent* GrappleLine;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GrapplingHook, meta = (AllowPrivateAccess = "true"))
-	float TimeToReach = 0.5f;
+	float TimeToReach = 0.25f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GrapplingHook, meta = (AllowPrivateAccess = "true"))
+	float TimeToStore = 0.2f;
 	
 public:	
 	// Sets default values for this actor's properties
@@ -32,9 +34,13 @@ private:
 	FVector _endingLocation;
 	FVector _direction;
 
+	ACharacter* Owner;
+
 	float _progress = -1;
+	bool _goBackToOwner = false;
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	void StartGrapple(FVector Start, FVector Target, ACharacter* GrappleOwner);
+	void EndGrapple();
 };
