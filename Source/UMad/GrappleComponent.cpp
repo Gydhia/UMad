@@ -32,7 +32,7 @@ void UGrappleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 
 void UGrappleComponent::BeginGrapple(AActor* NearestAttach)
 {
-	FVector Start = Owner->GetActorLocation();
+	FVector Start = Owner->GetMesh()->GetSocketLocation(FName("RightHand"));
 	UWorld* World = GetWorld();
 
 	TargetAttach = NearestAttach->GetActorLocation();

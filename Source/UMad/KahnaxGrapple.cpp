@@ -42,7 +42,7 @@ void AKahnaxGrapple::Tick(float DeltaTime)
 			else
 			{
 				_progress += DeltaTime;
-				GrappleLine->SetVectorParameter(FName("GrappleEnd"), FMath::Lerp(_startingLocation, Owner->GetMesh()->GetBoneLocation(FName("RightHand")), _progress / TimeToReach));
+				GrappleLine->SetVectorParameter(FName("GrappleEnd"), FMath::Lerp(_startingLocation, Owner->GetMesh()->GetBoneLocation(FName("RightHand")), _progress / TimeToStore));
 			}
 		}
 		else
@@ -62,7 +62,7 @@ void AKahnaxGrapple::StartGrapple(FVector Start, FVector Target, ACharacter* Gra
 	_endingLocation = Target;
 
 	Owner = GrappleOwner;
-	GrappleLine->SetVectorParameter(FName("GrappleEnd"), Target);
+	GrappleLine->SetVectorParameter(FName("GrappleEnd"), Start);
 	GrappleLine->Activate();
 	GrappleLine->AttachToComponent(GrappleOwner->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, FName("RightHand"));
 

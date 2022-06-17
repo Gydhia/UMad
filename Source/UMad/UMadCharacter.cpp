@@ -3,9 +3,7 @@
 
 #include "UMadCharacter.h"
 
-#include <string>
 
-#include "GrappleLine.h"
 #include "UMadAbilitySystemComponent.h"
 #include "UMadAttributeSet.h"
 #include "UUMadGameplayAbility.h"
@@ -18,9 +16,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
-#include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
-#include "CableComponent.h"
 #include "GrappleComponent.h"
 #include "AI/NavigationSystemBase.h"
 
@@ -65,9 +61,9 @@ AUMadCharacter::AUMadCharacter()
 		GrappleComp->Owner = this;
 
 		GrappleForce = NewObject<UCurveFloat>();
-		GrappleForce->FloatCurve.AddKey(0.0f, 100.0f);
-		GrappleForce->FloatCurve.AddKey(GrappleChargeTime, 1000.0f);
-		GrappleForce->FloatCurve.AddKey(5.0f, 10000.0f);
+		GrappleForce->FloatCurve.AddKey(0.0f, 250.0f);
+		GrappleForce->FloatCurve.AddKey(GrappleChargeTime, 1500.0f);
+		GrappleForce->FloatCurve.AddKey(GrappleTimeBeforeExplosion, 15000.0f);
 	
     	// Create a follow camera
     	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -248,27 +244,36 @@ void AUMadCharacter::GetNearestAttach()
 				LowestI = i;
 			}
 		}
+
+		_attachesTimer = 0;
 	}
 	if(NearestGrapplingAttach != nullptr)
 		NearestGrapplingAttach->UnselectAttach();
 	NearestGrapplingAttach = PossibleGrapplingAttaches[LowestI];
 	NearestGrapplingAttach->SelectAttach();
-
-	_attachesTimer = 0;
 }
 
 void AUMadCharacter::StartGrappling()
 {
 	if(NearestGrapplingAttach != nullptr)
 	{
+		_grappleTimer = 0.0f;
+		CurrentGrapplingAttach = NearestGrapplingAttach;
+
 		FInputAxisBinding axisBind = FInputAxisBinding("MoveForward");
 		ResetBinding(axisBind);
 		axisBind = FInputAxisBinding("MoveRight");
 		ResetBinding(axisBind);
 
-	    IsUsingGrapple = true;
+		FRotator PlayerRot = UKismetMathLibrary::FindLookAtRotation(this->GetActorLocation(), CurrentGrapplingAttach->GetActorLocation());
+		PlayerRot.Pitch = 0;
+		PlayerRot.Roll = 0;
+		PlayerRot.Yaw -= 30.0f;
+		SetActorRotation(PlayerRot);
+		
+	    this->IsUsingGrapple = true;
 		_beginGrapple = UGameplayStatics::GetRealTimeSeconds(GetWorld());
-		GrappleComp->BeginGrapple(NearestGrapplingAttach);
+		GrappleComp->BeginGrapple(CurrentGrapplingAttach);
 	}
 }
 void AUMadCharacter::ResetBinding(FInputAxisBinding bind)
@@ -291,25 +296,24 @@ bool AUMadCharacter::CompareInputActionBindings(FInputAxisBinding lhs, FInputAxi
 
 void AUMadCharacter::EndGrappling()
 {
+	if(CurrentGrapplingAttach == nullptr)
+		return;
+
 	InputComponent->BindAxis("MoveForward", this, &AUMadCharacter::MoveForward);
 	InputComponent->BindAxis("MoveRight", this, &AUMadCharacter::MoveRight);
 	
-	if(NearestGrapplingAttach == nullptr)
-		return;
-	
-	bool HasReleasedGrapple = true;
+	HasReleasedGrapple = true;
 	float chargingTime = UGameplayStatics::GetRealTimeSeconds(GetWorld()) - _beginGrapple;
-	if(GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, FString::SanitizeFloat(chargingTime));	
-	FVector dir = NearestGrapplingAttach->GetActorLocation() - GetActorLocation();
-	dir.Normalize();
-	
-	dir *= GrappleForce->GetFloatValue(chargingTime);
-	if(GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, dir.ToString());
 
+	FVector dir = CurrentGrapplingAttach->GetActorLocation() - GetActorLocation();
+	dir.Normalize();
+	dir *= GrappleForce->GetFloatValue(chargingTime);
+
+	this->HasReleasedGrapple = true;
 	GrappleComp->EndGrapple();
 	LaunchCharacter(dir, true, true);
+
+	CurrentGrapplingAttach = nullptr;
 }
 
 #pragma endregion GrapplingHook
@@ -318,12 +322,18 @@ void AUMadCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if(this->IsUsingGrapple)
+	{
+		_grappleTimer += DeltaSeconds;
+		if(_grappleTimer >= GrappleTimeBeforeExplosion)
+		{
+			EndGrappling();
+			_grappleTimer = 0;
+		}
+	}
+	
 	if(_attachesTimer != -1)
 	{
-		FHitResult hit;
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(this);
-		
 		_attachesTimer += DeltaSeconds;
 		if(_attachesTimer > 0.2)
 			GetNearestAttach();

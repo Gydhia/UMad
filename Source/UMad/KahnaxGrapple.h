@@ -17,7 +17,9 @@ class UMAD_API AKahnaxGrapple : public AActor
 	UNiagaraComponent* GrappleLine;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GrapplingHook, meta = (AllowPrivateAccess = "true"))
-	float TimeToReach = 0.5f;
+	float TimeToReach = 0.25f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GrapplingHook, meta = (AllowPrivateAccess = "true"))
+	float TimeToStore = 0.2f;
 	
 public:	
 	// Sets default values for this actor's properties
