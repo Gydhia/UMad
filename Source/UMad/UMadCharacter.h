@@ -6,6 +6,9 @@
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include <GameplayEffectTypes.h>
+
+#include "CableActor.h"
+#include "GrapplingAttachActor.h"
 #include "UMadCharacter.generated.h"
 
 UCLASS(Config=Game)
@@ -26,6 +29,9 @@ class UMAD_API AUMadCharacter : public ACharacter, public IAbilitySystemInterfac
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Collider, meta = (AllowPrivateAccess = "true"))
 	class USphereComponent* GrappleAttachesCollider;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Grapple, meta = (AllowPrivateAccess = "true"))
+	class UGrappleComponent* GrappleComp;
 	
 	UPROPERTY()
 	class UUMadAttributeSet* Attributes;
@@ -41,6 +47,21 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
 	float BaseLookUpRate;
 
+	UPROPERTY(BlueprintReadWrite)
+	bool IsUsingGrapple;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool HasReleasedGrapple;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UCurveFloat* GrappleForce = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GrapplingHook, meta = (AllowPrivateAccess = "true"))
+	float GrappleTimeBeforeExplosion = 1.5f;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float GrappleChargeTime = 0.6f;
+	
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	virtual void InitializeAttributes();
@@ -48,19 +69,36 @@ public:
 
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
-	
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Orthar")
+
+	void AddPossibleGrapplingAttach(AGrapplingAttachActor* Actor);
+	void RemovePossibleGrapplingAttach(AGrapplingAttachActor* Actor);
+	void GetNearestAttach();
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "UMad")
 	TSubclassOf<class UGameplayEffect> DefaultAttributeEffect;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Orthar")
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "UMad")
 	TArray<TSubclassOf<class UUMadGameplayAbility>> DefaultAbilities;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "UMad")
+	TArray<AGrapplingAttachActor*> PossibleGrapplingAttaches;
+
+	AGrapplingAttachActor* NearestGrapplingAttach = nullptr;
+	AGrapplingAttachActor* CurrentGrapplingAttach = nullptr;
 	
+	virtual void Tick(float DeltaSeconds) override;
+	float GetAngleFromAttach(FVector Start, FVector Target);
 protected:
 	/** Called for forwards/backward input */
 	void MoveForward(float Value);
 
 	/** Called for side to side input */
 	void MoveRight(float Value);
+	void StartGrappling();
+	void ResetBinding(FInputAxisBinding bind);
+	bool CompareInputActionBindings(FInputAxisBinding lhs, FInputAxisBinding rhs);
+	void EndGrappling();
+	void Ragdoll();
 
 	/** 
 	 * Called via input to turn at a given rate. 
@@ -75,15 +113,21 @@ protected:
 	void LookUpAtRate(float Rate);
 private:
 	bool _initedInputs = false;
+	float _attachesTimer = -1;
+	float _beginGrapple = -1;
+	float _grappleTimer = -1;
+	ACableActor* _grappleLine;
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	// End of APawn interface
-
+	
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+	
+	
 
 };
