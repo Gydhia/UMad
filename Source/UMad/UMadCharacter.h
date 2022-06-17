@@ -52,6 +52,9 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	bool HasReleasedGrapple;
+
+	UPROPERTY(BlueprintReadWrite)
+	float RagdollDelay = 2.0f;
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UCurveFloat* GrappleForce = nullptr;
@@ -99,6 +102,7 @@ protected:
 	bool CompareInputActionBindings(FInputAxisBinding lhs, FInputAxisBinding rhs);
 	void EndGrappling();
 	void Ragdoll();
+	void EndRagdoll();
 
 	/** 
 	 * Called via input to turn at a given rate. 

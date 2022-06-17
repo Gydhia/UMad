@@ -379,4 +379,33 @@ void AUMadCharacter::Ragdoll()
 	MeshComp->SetAllBodiesSimulatePhysics(true);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	this->DisableInput(UGameplayStatics::GetPlayerController(GetWorld(), 0));
+
+	FTimerHandle UnusedHandle;
+	GetWorldTimerManager().SetTimer(UnusedHandle, this, &AUMadCharacter::EndRagdoll, RagdollDelay, false);
+	
+}
+
+void AUMadCharacter::EndRagdoll()
+{
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	this->EnableInput(UGameplayStatics::GetPlayerController(GetWorld(), 0));
+	MeshComp->SetAllBodiesSimulatePhysics(false);
+	MeshComp->SetSimulatePhysics(false);
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	FVector NewLocation = FVector(0.0f, 0.0f, -90.0f);
+	FRotator NewRotator = FRotator(0.0f, -90.0f, 0.0f);
+	for(auto boneName : MeshComp->GetAllSocketNames())
+	{
+		MeshComp->PutRigidBodyToSleep(boneName);
+		MeshComp->SetRelativeLocationAndRotation(NewLocation, NewRotator, false, false);
+		FAttachmentTransformRules Rules = FAttachmentTransformRules(FAttachmentTransformRules::SnapToTargetIncludingScale);
+		Rules.ScaleRule = EAttachmentRule::KeepRelative;
+		Rules.LocationRule = EAttachmentRule::SnapToTarget;
+		Rules.RotationRule = EAttachmentRule::SnapToTarget;
+		Rules.bWeldSimulatedBodies = false;
+		MeshComp->AttachToComponent(GetCapsuleComponent(), Rules, FName("None"));
+	}
 }
