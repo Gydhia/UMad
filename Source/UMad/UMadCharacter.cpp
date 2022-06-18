@@ -3,6 +3,7 @@
 
 #include "UMadCharacter.h"
 
+#include "GrappleLine.h"
 #include "UMadAbilitySystemComponent.h"
 #include "UMadAttributeSet.h"
 #include "UUMadGameplayAbility.h"
@@ -13,6 +14,22 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "Particles/ParticleSystem.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "CableComponent.h"
+#include "GrappleComponent.h"
+
+//UENUM(BlueprintType)
+UENUM()
+enum Status
+{
+	Retracted     UMETA(DisplayName = "Retracted"),
+	Firing      UMETA(DisplayName = "Firing"),
+	NearingTarget   UMETA(DisplayName = "NearingTarget"),
+	OnTarget	UMETA(DisplayName = "OnTarget")
+};
 
 // Sets default values
 AUMadCharacter::AUMadCharacter()
@@ -40,11 +57,13 @@ AUMadCharacter::AUMadCharacter()
     	CameraBoom->SetupAttachment(RootComponent);
     	CameraBoom->TargetArmLength = 300.0f; // The camera follows at this distance behind the character	
     	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
-    
-    	GrappleAttachesCollider = CreateDefaultSubobject<USphereComponent>(TEXT("GrappleAttachesCollider"));
-    	GrappleAttachesCollider->SetupAttachment((RootComponent));
-    	GrappleAttachesCollider->InitSphereRadius(100);
-    	
+
+		GrappleComp = CreateDefaultSubobject<UGrappleComponent>(TEXT("Grapple Component"));
+		GrappleComp->Owner = this;
+	
+		GrappleBeginEffect = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("GrappleBeginEffect"));
+		GrappleBeginEffect->SetupAttachment(RootComponent);
+	
     	// Create a follow camera
     	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
     	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
@@ -68,7 +87,10 @@ void AUMadCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
     	check(PlayerInputComponent);
     	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
     	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
-    
+		PlayerInputComponent->BindAction("Grapple", IE_Pressed, this, &AUMadCharacter::StartGrappling);
+		PlayerInputComponent->BindAction("Grapple", IE_Released, this, &AUMadCharacter::EndGrappling);
+		PlayerInputComponent->BindAction("Ragdoll", IE_Pressed, this, &AUMadCharacter::Ragdoll);
+	
     	PlayerInputComponent->BindAxis("MoveForward", this, &AUMadCharacter::MoveForward);
     	PlayerInputComponent->BindAxis("MoveRight", this, &AUMadCharacter::MoveRight);
     
@@ -83,7 +105,7 @@ void AUMadCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
     	if(AbilitySystemComponent && InputComponent)
     	{
     		const FGameplayAbilityInputBinds Binds (
-    			"Confirm","Cancel","EOrtharAbilityInputID",
+    			"Confirm","Cancel","EUMadAbilityInputID",
     			static_cast<int32>(EUMadAbilityInputID::Confirm), static_cast<int32>(EUMadAbilityInputID::Cancel));
     		AbilitySystemComponent->BindAbilityActivationToInputComponent(InputComponent, Binds);
     	}
@@ -164,6 +186,120 @@ void AUMadCharacter::OnRep_PlayerState()
 	// }
 }
 
+#pragma region GrapplingHook
+
+void AUMadCharacter::AddPossibleGrapplingAttach(AGrapplingAttachActor* Actor)
+{
+	if(Actor != nullptr)
+	{
+		PossibleGrapplingAttaches.Add(Actor);
+		
+		GetNearestAttach();
+	}
+}
+
+void AUMadCharacter::RemovePossibleGrapplingAttach(AGrapplingAttachActor* Actor)
+{
+	if(Actor != nullptr)
+	{
+		if(NearestGrapplingAttach == Actor)
+		{
+			NearestGrapplingAttach->UnselectAttach();
+			NearestGrapplingAttach = nullptr;
+		}
+		
+		PossibleGrapplingAttaches.Remove(Actor);
+		
+		GetNearestAttach();
+	}
+}
+
+void AUMadCharacter::GetNearestAttach()
+{
+	const int NbOfAttaches = PossibleGrapplingAttaches.Num();
+	int LowestI = 0;
+	_attachesTimer = -1;
+	
+	if(NbOfAttaches == 0)
+		return;
+	else if(NbOfAttaches > 1)
+	{
+		APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+		int vX, vY;
+		PlayerController->GetViewportSize(vX, vY);
+		FVector2D vDimensions = FVector2D(vX, vY);
+		FVector2D finalLocation;
+	
+		float LowestDist = std::numeric_limits<float>::max();
+		for (int i = 0; i < NbOfAttaches; i++)
+		{
+			PlayerController->ProjectWorldLocationToScreen(PossibleGrapplingAttaches[i]->GetTransform().GetLocation(), finalLocation);
+			FVector2D resultVector = (vDimensions / 2) - finalLocation;
+
+			int dist = resultVector.Length();
+		
+			if(dist < LowestDist) {
+				LowestDist = dist;
+				LowestI = i;
+			}
+		}
+	}
+	if(NearestGrapplingAttach != nullptr)
+		NearestGrapplingAttach->UnselectAttach();
+	NearestGrapplingAttach = PossibleGrapplingAttaches[LowestI];
+	NearestGrapplingAttach->SelectAttach();
+
+	_attachesTimer = 0;
+}
+
+void AUMadCharacter::StartGrappling()
+{
+	if(NearestGrapplingAttach != nullptr)
+	{
+	    IsUsingGrapple = true;
+		_beginGrapple = UGameplayStatics::GetRealTimeSeconds(GetWorld());
+		GrappleComp->BeginGrapple(NearestGrapplingAttach);
+	}
+}
+
+void AUMadCharacter::EndGrappling()
+{
+	if(NearestGrapplingAttach == nullptr)
+		return;
+	
+	bool HasReleasedGrapple = true;
+	float chargingTime = UGameplayStatics::GetRealTimeSeconds(GetWorld()) - _beginGrapple;
+
+	if(M_GrapplePull)
+		PlayAnimMontage(M_GrapplePull, 1, NAME_None);
+	FVector dir = NearestGrapplingAttach->GetActorLocation() - GetActorLocation();
+	dir *= 2;
+	//LaunchCharacter(dir, true, true);
+}
+
+#pragma endregion GrapplingHook
+
+void AUMadCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(_attachesTimer != -1)
+	{
+		FHitResult hit;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		
+		GetWorld()->LineTraceSingleByChannel(hit, GetActorLocation(), NearestGrapplingAttach->GetActorLocation(), ECollisionChannel::ECC_Visibility, Params,FCollisionResponseParams());
+		DrawDebugLine(GetWorld(),GetActorLocation(), NearestGrapplingAttach->GetActorLocation(), FColor::Red, false, 5.0f);
+		
+		_attachesTimer += DeltaSeconds;
+		if(_attachesTimer > 0.2)
+			GetNearestAttach();
+	}
+}
+
+
+
 void AUMadCharacter::MoveForward(float Value)
 {
 	if ((Controller != nullptr) && (Value != 0.0f))
@@ -194,3 +330,11 @@ void AUMadCharacter::MoveRight(float Value)
 }
 
 
+
+void AUMadCharacter::Ragdoll()
+{
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	MeshComp->SetAllBodiesSimulatePhysics(true);
+	MeshComp->SetSimulatePhysics(true);
+	MeshComp->WakeAllRigidBodies();
+}
