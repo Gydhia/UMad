@@ -3,6 +3,8 @@
 
 #include "UMadCharacter.h"
 
+#include <string>
+
 
 #include "UMadAbilitySystemComponent.h"
 #include "UMadAttributeSet.h"
@@ -334,6 +336,25 @@ void AUMadCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if(GetMesh()->GetComponentLocation().Z <= 300)
+	{
+		IsDead = true;
+		//UE_LOG(LogTemp, Warning, TEXT("YOU DIED UNDER WORLD"));
+	}
+
+	if(this->_isUnderRagdoll)
+	{
+		_ragdollTimer += DeltaSeconds;
+		
+		if(_ragdollTimer >= 2.0f)
+		{
+			if(FVector::Distance(GetMesh()->GetComponentVelocity(), FVector::Zero()) < 2.0f)
+			{
+				EndRagdoll();
+			}	
+		}
+	}
+	
 	if(this->IsUsingGrapple)
 	{
 		_grappleTimer += DeltaSeconds;
@@ -383,34 +404,46 @@ void AUMadCharacter::MoveRight(float Value)
 	}
 }
 
-
+void AUMadCharacter::HitByTrap(FVector Impulse)
+{
+	_impulse = Impulse;
+	this->Ragdoll();
+}
 
 void AUMadCharacter::Ragdoll()
 {
 	GetCharacterMovement()->AirControl = 0;
+	this->_isUnderRagdoll = true;
 	
 	USkeletalMeshComponent* MeshComp = GetMesh();
 	MeshComp->SetAllBodiesSimulatePhysics(true);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	this->DisableInput(UGameplayStatics::GetPlayerController(GetWorld(), 0));
-
-	FTimerHandle UnusedHandle;
-	GetWorldTimerManager().SetTimer(UnusedHandle, this, &AUMadCharacter::EndRagdoll, RagdollDelay, false);
+	GetCharacterMovement()->DisableMovement();
+	
+	MeshComp->SetEnableGravity(true);
+	if(_impulse != FVector::Zero())
+		MeshComp->AddImpulse(_impulse);
 }
 
 void AUMadCharacter::EndRagdoll()
 {
+	this->_isUnderRagdoll = false;
+	this->_ragdollTimer = 0.0f;
+	this->_impulse = FVector::Zero();
+	
 	GetCharacterMovement()->AirControl = 0.85f;
+	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
 	
 	USkeletalMeshComponent* MeshComp = GetMesh();
-	this->EnableInput(UGameplayStatics::GetPlayerController(GetWorld(), 0));
+	
+	GetCapsuleComponent()->SetWorldLocation(MeshComp->GetComponentLocation() + FVector(0.0f, 0.0f, 30.0f));
 	MeshComp->SetAllBodiesSimulatePhysics(false);
 	MeshComp->SetSimulatePhysics(false);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	FVector NewLocation = FVector(0.0f, 0.0f, -90.0f);
+	FVector NewLocation = FVector(0.0f, 0.0f, -95.0f);
 	FRotator NewRotator = FRotator(0.0f, -90.0f, 0.0f);
 	for(auto boneName : MeshComp->GetAllSocketNames())
 	{
@@ -422,5 +455,6 @@ void AUMadCharacter::EndRagdoll()
 		Rules.RotationRule = EAttachmentRule::SnapToTarget;
 		Rules.bWeldSimulatedBodies = false;
 		MeshComp->AttachToComponent(GetCapsuleComponent(), Rules, FName("None"));
+		MeshComp->SetEnableGravity(false);
 	}
 }
