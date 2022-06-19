@@ -1,5 +1,8 @@
 
 #include "UDPComponent.h"
+
+#include <string>
+
 #include "Async/Async.h"
 #include "SocketSubsystem.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -70,6 +73,16 @@ bool UUDPComponent::CloseSendSocket()
 	Settings.SendBoundPort = 0;
 	Settings.SendBoundIP = FString(TEXT("0.0.0.0"));
 	return Native->CloseSendSocket();
+}
+
+FString UUDPComponent::GetLocalIPAddress()
+{
+	return Native->GetLocalIPAddress();
+}
+
+int32 UUDPComponent::SetAndGetBroadcastIPAddress(int UDPPort, const TArray<uint8>& Bytes)
+{
+	return Native->SetAndGetBroadcastIPAddress(UDPPort, Bytes);
 }
 
 bool UUDPComponent::OpenReceiveSocket(const FString& InListenIp /*= TEXT("0.0.0.0")*/, const int32 InListenPort /*= 3002*/)
@@ -205,6 +218,36 @@ bool FUDPNative::CloseSendSocket()
 	}
 
 	return bDidCloseCorrectly;
+}
+
+FString FUDPNative::GetLocalIPAddress()
+{
+	bool canBind = false;
+	TSharedRef<FInternetAddr> localIp = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalHostAddr(*GLog, canBind);
+	
+	if (localIp->IsValid())
+	{
+		//GLog->Log(localIp->ToString(false)); // if you want to append the port (true) or not (false).
+		return localIp->ToString(false);
+	}
+	else
+	{
+		return FString("");
+	}
+}
+
+int32 FUDPNative::SetAndGetBroadcastIPAddress(int UDPPort, const TArray<uint8>& Bytes)
+{
+	bool canBind = false;
+	TSharedRef<FInternetAddr> BroadcastAddr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalHostAddr(*GLog, canBind);
+	BroadcastAddr->SetBroadcastAddress();
+	BroadcastAddr->SetPort(UDPPort);
+	uint32 address;
+	BroadcastAddr->GetIp(address);
+	int32 BytesSent;
+	SenderSocket->SendTo(Bytes.GetData(), Bytes.Num(), BytesSent, *BroadcastAddr);
+	
+	return address;
 }
 
 bool FUDPNative::EmitBytes(const TArray<uint8>& Bytes)
