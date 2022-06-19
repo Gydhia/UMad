@@ -57,13 +57,10 @@ AUMadCharacter::AUMadCharacter()
     	CameraBoom->TargetArmLength = 300.0f; // The camera follows at this distance behind the character	
     	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
 
-		GrappleComp = CreateDefaultSubobject<UGrappleComponent>(TEXT("Grapple Component"));
-		GrappleComp->Owner = this;
+		this->GrappleComp = CreateDefaultSubobject<UGrappleComponent>(TEXT("Grapple Component"));
+		this->GrappleComp->Owner = this;
 
-		GrappleForce = NewObject<UCurveFloat>();
-		GrappleForce->FloatCurve.AddKey(0.0f, 250.0f);
-		GrappleForce->FloatCurve.AddKey(GrappleChargeTime, 1500.0f);
-		GrappleForce->FloatCurve.AddKey(GrappleTimeBeforeExplosion, 15000.0f);
+		this->SetupGrappleForce();
 	
     	// Create a follow camera
     	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -111,6 +108,21 @@ void AUMadCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
     		AbilitySystemComponent->BindAbilityActivationToInputComponent(InputComponent, Binds);
     	}
 
+}
+
+void AUMadCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	GetCharacterMovement()->AirControl = 0.85f;
+	this->SetupGrappleForce();
+}
+
+void AUMadCharacter::SetupGrappleForce()
+{
+	GrappleForce = NewObject<UCurveFloat>();
+	GrappleForce->FloatCurve.AddKey(0.0f, 250.0f);
+	GrappleForce->FloatCurve.AddKey(GrappleChargeTime, 1500.0f);
+	GrappleForce->FloatCurve.AddKey(GrappleTimeBeforeExplosion, 15000.0f);
 }
 
 void AUMadCharacter::TurnAtRate(float Rate)
@@ -273,7 +285,7 @@ void AUMadCharacter::StartGrappling()
 		
 	    this->IsUsingGrapple = true;
 		_beginGrapple = UGameplayStatics::GetRealTimeSeconds(GetWorld());
-		GrappleComp->BeginGrapple(CurrentGrapplingAttach);
+		this->GrappleComp->BeginGrapple(CurrentGrapplingAttach);
 	}
 }
 void AUMadCharacter::ResetBinding(FInputAxisBinding bind)
@@ -310,7 +322,7 @@ void AUMadCharacter::EndGrappling()
 	dir *= GrappleForce->GetFloatValue(chargingTime);
 
 	this->HasReleasedGrapple = true;
-	GrappleComp->EndGrapple();
+	this->GrappleComp->EndGrapple();
 	LaunchCharacter(dir, true, true);
 
 	CurrentGrapplingAttach = nullptr;
@@ -375,6 +387,8 @@ void AUMadCharacter::MoveRight(float Value)
 
 void AUMadCharacter::Ragdoll()
 {
+	GetCharacterMovement()->AirControl = 0;
+	
 	USkeletalMeshComponent* MeshComp = GetMesh();
 	MeshComp->SetAllBodiesSimulatePhysics(true);
 	MeshComp->SetSimulatePhysics(true);
@@ -388,6 +402,8 @@ void AUMadCharacter::Ragdoll()
 
 void AUMadCharacter::EndRagdoll()
 {
+	GetCharacterMovement()->AirControl = 0.85f;
+	
 	USkeletalMeshComponent* MeshComp = GetMesh();
 	this->EnableInput(UGameplayStatics::GetPlayerController(GetWorld(), 0));
 	MeshComp->SetAllBodiesSimulatePhysics(false);
