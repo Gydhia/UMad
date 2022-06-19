@@ -344,6 +344,7 @@ void AUMadCharacter::Tick(float DeltaSeconds)
 
 	if(this->_isUnderRagdoll)
 	{
+		SetActorLocation(GetMesh()->GetComponentLocation(), false);
 		_ragdollTimer += DeltaSeconds;
 		
 		if(_ragdollTimer >= 2.0f)
