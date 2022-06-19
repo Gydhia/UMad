@@ -7,6 +7,16 @@
 #include "Common/UdpSocketSender.h"
 #include "UDPComponent.generated.h"
 
+
+USTRUCT(BlueprintType) 
+struct FUMadNetworkDatas
+{
+GENERATED_BODY()
+public:
+     UPROPERTY(BlueprintReadWrite, Category="NetworkData")
+     FString ComputerIP;
+ };
+ 
 //UDP Connection Settings
 USTRUCT(BlueprintType)
 struct UDPWRAPPER_API FUDPSettings
