@@ -63,7 +63,7 @@ public:
 	UCurveFloat* GrappleForce = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GrapplingHook, meta = (AllowPrivateAccess = "true"))
-	float GrappleTimeBeforeExplosion = 1.5f;
+	float GrappleTimeBeforeExplosion = 2.0f;
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float GrappleChargeTime = 0.6f;

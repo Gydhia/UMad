@@ -361,7 +361,15 @@ void AUMadCharacter::Tick(float DeltaSeconds)
 		_grappleTimer += DeltaSeconds;
 		if(_grappleTimer >= GrappleTimeBeforeExplosion)
 		{
+			float chargingTime = UGameplayStatics::GetRealTimeSeconds(GetWorld()) - _beginGrapple;
+			FVector dir = CurrentGrapplingAttach->GetActorLocation() - GetActorLocation();
+			dir.Normalize();
+			dir *= GrappleForce->GetFloatValue(chargingTime);
+
 			EndGrappling();
+			dir.Set(dir.X * FMath::RandRange(1.0f, 1.5f), FMath::RandRange(1.0f, 1.5f), dir.Z) ;
+			HitByTrap(dir * 15);
+				
 			_grappleTimer = 0;
 		}
 	}
