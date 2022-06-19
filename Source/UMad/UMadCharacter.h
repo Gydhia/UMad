@@ -48,6 +48,9 @@ public:
 	float BaseLookUpRate;
 
 	UPROPERTY(BlueprintReadWrite)
+	bool IsDead = false;
+	
+	UPROPERTY(BlueprintReadWrite)
 	bool IsUsingGrapple;
 	
 	UPROPERTY(BlueprintReadWrite)
@@ -88,6 +91,9 @@ public:
 
 	AGrapplingAttachActor* NearestGrapplingAttach = nullptr;
 	AGrapplingAttachActor* CurrentGrapplingAttach = nullptr;
+
+	UFUNCTION(BlueprintCallable)
+	void HitByTrap(FVector Impulse);
 	
 	virtual void Tick(float DeltaSeconds) override;
 	float GetAngleFromAttach(FVector Start, FVector Target);
@@ -117,10 +123,13 @@ protected:
 	void LookUpAtRate(float Rate);
 private:
 	bool _initedInputs = false;
+	bool _isUnderRagdoll = false;
+	float _ragdollTimer = 0;
 	float _attachesTimer = -1;
 	float _beginGrapple = -1;
 	float _grappleTimer = -1;
 	ACableActor* _grappleLine;
+	FVector _impulse = FVector::Zero();
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
