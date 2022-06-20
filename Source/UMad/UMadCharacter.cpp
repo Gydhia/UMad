@@ -124,6 +124,7 @@ void AUMadCharacter::SetupGrappleForce()
 	GrappleForce = NewObject<UCurveFloat>();
 	GrappleForce->FloatCurve.AddKey(0.0f, 250.0f);
 	GrappleForce->FloatCurve.AddKey(GrappleChargeTime, 1500.0f);
+	GrappleForce->FloatCurve.AddKey(GrappleTimeBeforeExplosion - 0.01f, 1800.0f);
 	GrappleForce->FloatCurve.AddKey(GrappleTimeBeforeExplosion, 15000.0f);
 }
 

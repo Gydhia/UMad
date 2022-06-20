@@ -66,7 +66,7 @@ public:
 	float GrappleTimeBeforeExplosion = 2.0f;
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	float GrappleChargeTime = 0.6f;
+	float GrappleChargeTime = 0.85f;
 	
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
