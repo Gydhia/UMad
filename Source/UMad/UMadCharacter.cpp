@@ -314,6 +314,8 @@ void AUMadCharacter::EndGrappling()
 	if(CurrentGrapplingAttach == nullptr)
 		return;
 
+	GrappleTimer = 0.0f;
+
 	InputComponent->BindAxis("MoveForward", this, &AUMadCharacter::MoveForward);
 	InputComponent->BindAxis("MoveRight", this, &AUMadCharacter::MoveRight);
 	
