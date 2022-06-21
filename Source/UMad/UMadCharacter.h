@@ -67,6 +67,9 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float GrappleChargeTime = 0.85f;
+
+	UPROPERTY(BlueprintReadOnly)
+	float GrappleTimer = -1;
 	
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
@@ -127,7 +130,6 @@ private:
 	float _ragdollTimer = 0;
 	float _attachesTimer = -1;
 	float _beginGrapple = -1;
-	float _grappleTimer = -1;
 	ACableActor* _grappleLine;
 	FVector _impulse = FVector::Zero();
 protected:
