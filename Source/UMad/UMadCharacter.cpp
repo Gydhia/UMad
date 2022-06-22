@@ -338,10 +338,13 @@ void AUMadCharacter::EndGrappling()
 void AUMadCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
-	if(GetMesh()->GetComponentLocation().Z <= 300)
+    
+    float zAxis = GetMesh()->GetComponentLocation().Z;
+	if(zAxis <= 250)
 	{
-		IsDead = true;
+	    this->Ragdoll();
+	    if(zAxis <= 50)
+			IsDead = true;
 		//UE_LOG(LogTemp, Warning, TEXT("YOU DIED UNDER WORLD"));
 	}
 
