@@ -342,7 +342,8 @@ void AUMadCharacter::Tick(float DeltaSeconds)
     float zAxis = GetMesh()->GetComponentLocation().Z;
 	if(zAxis <= 250)
 	{
-	    this->Ragdoll();
+		if (!this->_isUnderRagdoll)
+			this->Ragdoll();
 	    if(zAxis <= 50)
 			IsDead = true;
 		//UE_LOG(LogTemp, Warning, TEXT("YOU DIED UNDER WORLD"));
@@ -355,7 +356,7 @@ void AUMadCharacter::Tick(float DeltaSeconds)
 		
 		if(_ragdollTimer >= 2.0f)
 		{
-			if(FVector::Distance(GetMesh()->GetComponentVelocity(), FVector::Zero()) < 2.0f)
+			if(FVector::Distance(GetMesh()->GetComponentVelocity(), FVector::Zero()) < 4.0f)
 			{
 				EndRagdoll();
 			}	
@@ -453,7 +454,7 @@ void AUMadCharacter::EndRagdoll()
 	
 	USkeletalMeshComponent* MeshComp = GetMesh();
 	
-	GetCapsuleComponent()->SetWorldLocation(MeshComp->GetComponentLocation() + FVector(0.0f, 0.0f, 30.0f));
+	GetCapsuleComponent()->SetWorldLocation(MeshComp->GetComponentLocation() + FVector(0.0f, 0.0f, 100.0f));
 	MeshComp->SetAllBodiesSimulatePhysics(false);
 	MeshComp->SetSimulatePhysics(false);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
